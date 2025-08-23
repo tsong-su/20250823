@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台灣北部地圖互動遊戲</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+        }
+
+        .dropzone {
+            border: 2px dashed #b1b1b1;
+            border-radius: 10px;
+            position: absolute;
+            opacity: 0.7;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .dropzone.hover {
+            border-color: #4a90e2;
+            background-color: #e6f0ff;
+            transform: scale(1.05);
+        }
+
+        .correct {
+            border: 3px solid #4ade80 !important;
+            box-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
+            transition: all 0.3s ease-in-out;
+        }
+
+        .incorrect {
+            border: 3px solid #ef4444 !important;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+            transition: all 0.3s ease-in-out;
+        }
+
+        .stamp {
+            cursor: grab;
+            transition: transform 0.2s ease-in-out;
+        }
+        
+        .stamp:active {
+            cursor: grabbing;
+        }
+
+        .title {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #1e3a8a;
+            margin-top: 20px;
+            margin-bottom: 40px;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+    <h1 class="title">臺灣北部地圖 & 注音符號郵票配對遊戲</h1>
+    <div class="relative w-full max-w-7xl flex flex-col md:flex-row items-center justify-center">
+
+        <!-- 左側郵票區 -->
+        <div id="left-stamps" class="flex flex-col gap-4 p-4 rounded-xl bg-white shadow-lg z-10 md:absolute md:left-4">
+            <!-- 郵票圖片 (已更新) -->
+            <img draggable="true" id="stamp-ma" src="https://github.com/tsong-su/iuhi/blob/main/game4_assets/stamp1.jpg?raw=true" alt="馬" class="stamp rounded-lg shadow-md">
+            <img draggable="true" id="stamp-guang" src="https://github.com/tsong-su/iuhi/blob/main/game4_assets/north_img2.png?raw=true" alt="廣" class="stamp rounded-lg shadow-md">
+            <img draggable="true" id="stamp-sa" src="https://github.com/tsong-su/iuhi/blob/main/game4_assets/north_img3.png?raw=true" alt="撒" class="stamp rounded-lg shadow-md">
+            <img draggable="true" id="stamp-hua" src="https://github.com/tsong-su/iuhi/blob/main/game4_assets/north_img7.png?raw=true" alt="花" class="stamp rounded-lg shadow-md">
+            <img draggable="true" id="stamp-cao" src="https://github.com/tsong-su/iuhi/blob/main/game4_assets/north_img8.png?raw=true" alt="草" class="stamp rounded-lg shadow-md">
+            <img draggable="true" id="stamp-bi" src="https://github.com/tsong-su/iuhi/blob/main/game4_assets/north_img12.png?raw=true" alt="壁" class="stamp rounded-lg shadow-md">
+        </div>
+
+        <!-- 中間地圖區 -->
+        <div id="map-container" class="relative w-full max-w-[800px] aspect-[1200/800] my-8">
+            <!-- 台灣北部地圖圖片 -->
+            <img src="https://github.com/tsong-su/iuhi/blob/main/game4_assets/north2_map.png?raw=true" alt="台灣北部地圖" class="w-full h-auto rounded-xl shadow-2xl">
+
+            <!-- 拖放區 (Dropzones) -->
+            <!-- 台北市 (Taipei) -->
+            <div id="dropzone-taipei" data-correct-stamp="stamp-tai" class="dropzone w-[12%] h-[12%] top-[30%] left-[50%]"></div>
+            <!-- 新北市 (New Taipei) -->
+            <div id="dropzone-newtaipei" data-correct-stamp="stamp-sa" class="dropzone w-[18%] h-[20%] top-[40%] left-[58%]"></div>
+            <!-- 桃園縣 (Taoyuan) -->
+            <div id="dropzone-taoyuan" data-correct-stamp="stamp-ma" class="dropzone w-[15%] h-[15%] top-[50%] left-[45%]"></div>
+            <!-- 基隆市 (Keelung) -->
+            <div id="dropzone-keelung" data-correct-stamp="stamp-guang" class="dropzone w-[10%]
