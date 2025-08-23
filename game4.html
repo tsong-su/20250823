@@ -3,337 +3,632 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>臺灣印象配對趣</title>
+    <title>台灣北部縣市地圖挑戰</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* CSS 樣式區域 - 使用 Tailwind CSS 輔助 */
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: "Inter", sans-serif;
+            background-color: #f0f4f8; /* Light blue-gray background */
+            overflow: hidden; /* Prevent scrolling */
         }
-
-        /* 自訂樣式以覆蓋或擴展 Tailwind */
-        .stamp {
-            width: 100px;
-            height: 140px;
-            background-size: cover;
-            background-position: center;
-            user-select: none; /* 防止圖片被選取 */
+        .drag-item {
             cursor: grab;
-            transition: transform 0.2s, box-shadow 0.2s;
-            border-radius: 8px; /* 圓角 */
+            transition: transform 0.2s ease-in-out;
+            touch-action: none; /* Prevent browser default touch behavior */
         }
-        .stamp:hover {
-            transform: scale(1.05);
-            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.2);
-        }
-        .stamp.dragging {
-            opacity: 0.7;
+        .drag-item:active {
             cursor: grabbing;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
-            transform: scale(1.1);
-            z-index: 1000; /* 確保拖曳時郵票在最上層 */
+        }
+        .drop-target {
+            border: 2px dashed #9ca3af; /* Gray dashed border for drop zones */
+            background-color: rgba(229, 231, 235, 0.5); /* Light gray transparent background */
+            transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+            color: #4b5563; /* Darker text for readability */
+            font-size: 0.875rem; /* text-sm */
+            line-height: 1.25rem;
+        }
+        .drop-target.hovered {
+            background-color: rgba(209, 250, 229, 0.7); /* Light green on hover, more opaque */
+            border-color: #34d399; /* Green border on hover */
+        }
+        .drop-target.correct {
+            background-color: rgba(209, 250, 229, 0.8); /* Green for correct placement */
+            border-color: #34d399;
+            color: #10b981; /* Green text */
+            font-weight: bold;
+        }
+        .drop-target.incorrect {
+            background-color: rgba(254, 226, 226, 0.8); /* Red for incorrect placement */
+            border-color: #ef4444;
+            color: #ef4444; /* Red text */
+            font-weight: bold;
+        }
+        .message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            border: 2px solid #34d399;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            z-index: 1000;
+            display: none;
+            text-align: center;
+        }
+        .message-box button {
+            margin-top: 1rem;
+            padding: 0.5rem 1rem;
+            background-color: #34d399;
+            color: white;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+        }
+        .message-box button:hover {
+            background-color: #22c55e;
         }
 
-        .map-container {
+        /* Custom styles for the map image */
+        #map-container {
             position: relative;
-        }
-        .taiwan-map {
+            max-width: 600px; /* Constrain map size */
             width: 100%;
-            height: auto;
-            max-width: 800px; /* 限制地圖最大寬度 */
-            border-radius: 12px;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            aspect-ratio: 1.7777; /* Aspect ratio of north_map.jpg (approx 16:9) */
+            background-image: url('north_map.jpg-2d84987e-9da6-45bf-a482-7f896ea02aa3'); /* Use the uploaded map image with content ID */
+            background-size: contain; /* Scale the image to fit the container */
+            background-repeat: no-repeat; /* Do not repeat the image */
+            background-position: center; /* Center the image */
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            overflow: hidden; /* Ensure content doesn't spill out */
+            flex-shrink: 0; /* Prevent map from shrinking too much */
         }
 
-        .target-area {
+        /* Positions for drop zones on the map, adjusted for north_map.jpg */
+        /* These values are estimated and may need fine-tuning upon preview */
+        .drop-zone-overlay {
             position: absolute;
-            border: 2px dashed #ff0000; /* 紅色虛線框 */
-            background-color: rgba(255, 0, 0, 0.1);
-            border-radius: 8px; /* 圓角 */
-            transition: background-color 0.3s, border-color 0.3s;
-            z-index: 10;
+            opacity: 0.8; /* Make them slightly transparent */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #333;
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.7);
+            border-radius: 0.5rem;
+            box-sizing: border-box; /* Include padding and border in the element's total width and height */
+            text-align: center;
         }
-        .target-area.matched {
-            border: 2px solid #008000; /* 綠色實線框 */
-            background-color: rgba(0, 128, 0, 0.2);
+        /* Adjusted based on visual estimation from north_map.jpg */
+        #drop-taipei { top: 20%; left: 52%; width: 12%; height: 12%; } /* 台北市 */
+        #drop-keelung { top: 10%; left: 66%; width: 8%; height: 8%; } /* 基隆市 */
+        #drop-new-taipei { top: 38%; left: 56%; width: 18%; height: 18%; } /* 新北市 */
+        #drop-taoyuan { top: 38%; left: 39%; width: 13%; height: 13%; } /* 桃園縣 */
+        #drop-hsinchu { top: 55%; left: 31%; width: 11%; height: 11%; } /* 新竹縣 */
+        #drop-miaoli { top: 72%; left: 29%; width: 13%; height: 13%; } /* 苗栗縣 */
+
+
+        /* Styles for collected stamps on the right */
+        .collected-stamp-placeholder {
+            border: 2px dashed #d1d5db; /* Light gray dashed border */
+            background-color: #f9fafb; /* Very light gray */
         }
 
-        /* 根據新的地圖圖片 (north2_map.png)，請務必調整以下目標框的位置和尺寸 */
-        /* 目前的數值是基於舊地圖的，在新地圖上可能不準確 */
-        .target-area[data-match="taipei"] { top: 22%; left: 58%; width: 70px; height: 70px; }
-        .target-area[data-match="keelung"] { top: 25%; left: 70%; width: 60px; height: 60px; }
-        .target-area[data-match="new-taipei"] { top: 38%; left: 63%; width: 90px; height: 90px; }
-        .target-area[data-match="taoyuan"] { top: 37%; left: 49%; width: 90px; height: 90px; }
-        .target-area[data-match="hsinchu"] { top: 51%; left: 45%; width: 90px; height: 90px; }
-        .target-area[data-match="miaoli"] { top: 62%; left: 42%; width: 110px; height: 110px; }
-
-        /* 響應式設計 */
-        @media (max-width: 900px) {
-            main {
+        /* Fixed stamp grid layout */
+        .stamp-grid-container {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr)); /* 2 columns */
+            gap: 1rem; /* Gap between stamps */
+            max-width: 240px; /* Adjust based on stamp size (2x 96px + gap) */
+            flex-shrink: 0;
+            padding: 1rem;
+        }
+        /* Animation for "有夠gâu！" */
+        @keyframes scaleIn {
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.5); /* Slightly larger peak */
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        .victory-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            font-size: 3rem;
+            font-weight: bold;
+            color: #ef4444; /* Red color */
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            z-index: 1001;
+            opacity: 0;
+            animation: scaleIn 1s ease-out forwards;
+        }
+        /* Mobile adjustments */
+        @media (max-width: 1023px) { /* Tailind's lg breakpoint */
+            .main-game-layout {
                 flex-direction: column;
+                justify-content: flex-start; /* Align items to top on small screens */
                 align-items: center;
+                height: auto; /* Allow height to adjust */
+                min-height: 100vh; /* Ensure full viewport height */
             }
-            .stamp-container {
-                flex-direction: row;
-                flex-wrap: wrap;
-                justify-content: center;
-                gap: 10px;
-                flex: none; /* 在小螢幕上不固定寬度 */
-                width: 100%; /* 佔滿可用寬度 */
-            }
-            .stamp {
-                width: 80px;
-                height: 110px;
-            }
-            .map-container {
-                flex: 1;
+            .stamp-grid-container {
+                grid-template-columns: repeat(3, minmax(0, 1fr)); /* 3 columns on smaller screens */
+                max-width: none; /* Let it expand */
                 width: 100%;
+            }
+            #map-container {
+                max-width: 100%;
+                width: 100%; /* Adjust map width for mobile */
+                height: auto;
             }
         }
     </style>
 </head>
-<body class="flex flex-col items-center min-h-screen bg-gray-100 p-5">
+<body class="bg-gradient-to-br from-blue-100 to-green-100 min-h-screen w-screen flex flex-col items-center justify-center p-4">
 
-    <header class="w-full max-w-5xl text-center mb-8 bg-white p-6 rounded-lg shadow-md">
-        <h1 class="text-4xl font-extrabold text-gray-800 mb-4">臺灣印象配對趣</h1>
-        <div class="controls flex justify-center items-center gap-6">
-            <button id="startButton" class="px-6 py-3 text-lg font-bold text-white bg-blue-600 rounded-full shadow-lg hover:bg-blue-700 transition duration-300 ease-in-out transform hover:scale-105">
-                開始遊戲
-            </button>
-            <div class="timer text-2xl font-semibold text-gray-700">時間: <span id="timerDisplay">00:00</span></div>
-        </div>
-    </header>
+    <!-- Main Game Container -->
+    <div class="bg-white rounded-2xl shadow-xl p-8 max-w-7xl w-full h-full flex flex-col items-center justify-between space-y-8 lg:space-y-0 lg:flex-row lg:space-x-8 main-game-layout">
 
-    <main class="flex flex-col lg:flex-row w-full max-w-6xl justify-center gap-8 lg:gap-12 flex-grow">
-        <!-- 左側郵票容器 -->
-        <div id="leftStamps" class="stamp-container flex-shrink-0 bg-white p-4 rounded-lg shadow-md border border-gray-200">
-            <!-- 郵票圖片將由 JavaScript 動態生成 -->
+        <!-- Left: Draggable Stamps -->
+        <div class="flex-shrink-0 w-full lg:w-1/5 flex flex-col items-center space-y-4 p-4 bg-blue-50 rounded-lg shadow-inner h-full">
+            <h2 class="text-2xl font-semibold text-blue-700 mb-4">郵票區</h2>
+            <div id="stamps-container" class="stamp-grid-container h-full place-content-center">
+                <!-- Stamps will be dynamically loaded here -->
+            </div>
         </div>
 
-        <!-- 中間地圖容器 -->
-        <div id="mapContainer" class="map-container flex-grow bg-white p-4 rounded-lg shadow-md flex justify-center items-center relative">
-            <!-- 使用 GitHub 倉庫中的新地圖圖片 -->
-            <img src="https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/north2_map.png" alt="臺灣地圖" class="taiwan-map">
-            <!-- 地圖上的配對目標框 -->
-            <div class="target-area" data-match="taipei"></div>
-            <div class="target-area" data-match="keelung"></div>
-            <div class="target-area" data-match="new-taipei"></div>
-            <div class="target-area" data-match="taoyuan"></div>
-            <div class="target-area" data-match="hsinchu"></div>
-            <div class="target-area" data-match="miaoli"></div>
+        <!-- Center: Game Board (Map and Drop Zones) -->
+        <div class="flex-grow w-full lg:w-3/5 flex flex-col items-center justify-between space-y-6 relative h-full">
+            <div class="text-center w-full">
+                <h1 class="text-4xl font-extrabold text-blue-800 tracking-tight mb-4">
+                    <span class="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-green-600">
+                        台灣北部縣市地圖挑戰
+                    </span>
+                </h1>
+                <p class="text-lg text-gray-600">拖曳郵票到正確的縣市位置！</p>
+            </div>
+
+            <div id="map-container">
+                <!-- Map image is set as background in CSS -->
+                <!-- Drop zones. The text here helps identify the zones. -->
+                <div id="drop-taipei" class="drop-zone-overlay drop-target">台北市</div>
+                <div id="drop-keelung" class="drop-zone-overlay drop-target">基隆市</div>
+                <div id="drop-new-taipei" class="drop-zone-overlay drop-target">新北市</div>
+                <div id="drop-taoyuan" class="drop-zone-overlay drop-target">桃園縣</div>
+                <div id="drop-hsinchu" class="drop-zone-overlay drop-target">新竹縣</div>
+                <div id="drop-miaoli" class="drop-zone-overlay drop-target">苗栗縣</div>
+            </div>
+
+            <!-- Victory message container -->
+            <div id="victory-message-container" class="absolute top-0 left-0 w-full h-full flex items-center justify-center pointer-events-none" style="display: none;">
+                <div id="victory-text" class="victory-message">有夠gâu！</div>
+            </div>
+
+
+            <!-- Control Buttons -->
+            <div class="flex flex-wrap justify-center gap-4 mt-6 w-full lg:order-last">
+                <button id="reset-button" class="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg shadow-md transition transform hover:scale-105">
+                    <i class="fas fa-redo mr-2"></i> 閣耍一擺
+                </button>
+                <button id="back-to-home-button" class="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-lg shadow-md transition transform hover:scale-105">
+                    <i class="fas fa-home mr-2"></i> 回到遊戲首頁
+                </button>
+                <!-- Removed check and hint buttons as per new instructions. Can be re-added if needed. -->
+            </div>
         </div>
 
-        <!-- 右側郵票容器 -->
-        <div id="rightStamps" class="stamp-container flex-shrink-0 bg-white p-4 rounded-lg shadow-md border border-gray-200">
-            <!-- 郵票圖片將由 JavaScript 動態生成 -->
+        <!-- Right: Collected Stamps -->
+        <div class="flex-shrink-0 w-full lg:w-1/5 flex flex-col items-center space-y-4 p-4 bg-green-50 rounded-lg shadow-inner h-full">
+            <h2 class="text-2xl font-semibold text-green-700 mb-4">已蒐集郵票</h2>
+            <div id="collected-stamps-container" class="stamp-grid-container h-full place-content-center">
+                <!-- Placeholders for collected stamps -->
+                <div id="collected-taipei" class="collected-stamp-placeholder w-24 h-24 rounded-md flex items-center justify-center text-gray-400 text-sm">台北市</div>
+                <div id="collected-keelung" class="collected-stamp-placeholder w-24 h-24 rounded-md flex items-center justify-center text-gray-400 text-sm">基隆市</div>
+                <div id="collected-new-taipei" class="collected-stamp-placeholder w-24 h-24 rounded-md flex items-center justify-center text-gray-400 text-sm">新北市</div>
+                <div id="collected-taoyuan" class="collected-stamp-placeholder w-24 h-24 rounded-md flex items-center justify-center text-gray-400 text-sm">桃園縣</div>
+                <div id="collected-hsinchu" class="collected-stamp-placeholder w-24 h-24 rounded-md flex items-center justify-center text-gray-400 text-sm">新竹縣</div>
+                <div id="collected-miaoli" class="collected-stamp-placeholder w-24 h-24 rounded-md flex items-center justify-center text-gray-400 text-sm">苗栗縣</div>
+            </div>
         </div>
-    </main>
+
+    </div>
+
+    <!-- Message Box for Alerts -->
+    <div id="message-box" class="message-box">
+        <p id="message-text" class="text-xl font-medium text-gray-800"></p>
+        <button id="message-box-ok">確定</button>
+    </div>
+
+    <!-- Font Awesome for icons -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/js/all.min.js"></script>
 
     <script>
-        // JavaScript 邏輯區域
-        document.addEventListener('DOMContentLoaded', () => {
-            const startButton = document.getElementById('startButton');
-            const timerDisplay = document.getElementById('timerDisplay');
-            const leftStampsContainer = document.getElementById('leftStamps');
-            const rightStampsContainer = document.getElementById('rightStamps');
-            const mapContainer = document.getElementById('mapContainer');
-            const taiwanMap = document.querySelector('.taiwan-map');
-            let targetAreas = []; // 儲存目標區域的陣列
+        // Game Data and State
+        const regions = [
+            { id: 'taipei', name: '台北市', dropZoneId: 'drop-taipei', collectedId: 'collected-taipei' },
+            { id: 'keelung', name: '基隆市', dropZoneId: 'drop-keelung', collectedId: 'collected-keelung' },
+            { id: 'new-taipei', name: '新北市', dropZoneId: 'drop-new-taipei', collectedId: 'collected-new-taipei' },
+            { id: 'taoyuan', name: '桃園縣', dropZoneId: 'drop-taoyuan', collectedId: 'collected-taoyuan' },
+            { id: 'hsinchu', name: '新竹縣', dropZoneId: 'drop-hsinchu', collectedId: 'collected-hsinchu' },
+            { id: 'miaoli', name: '苗栗縣', dropZoneId: 'drop-miaoli', collectedId: 'collected-miaoli' },
+        ];
 
-            let timer;
-            let seconds = 0;
-            let isPlaying = false;
-            let matchedCount = 0;
+        // Using provided image file content IDs and placeholders for the rest
+        const stamps = [
+            { id: 'stamp-taipei', name: '台北市', image: 'stamp1.jpg-75ec659b-6492-40c5-b8b2-2197495c1f57', correctRegionId: 'taipei' },
+            { id: 'stamp-keelung', name: '基隆市', image: 'stamp2.jpg-b6da6bec-c91b-40de-b62e-18031c95b064', correctRegionId: 'keelung' },
+            { id: 'stamp-new-taipei', name: '新北市', image: 'stamp3.jpg-3551083e-8d47-4605-83e3-1b3a0f4534d5', correctRegionId: 'new-taipei' },
+            { id: 'stamp-taoyuan', name: '桃園縣', image: 'stamp4.jpg-9d04eae1-f0f8-4ad9-a37b-39260142b65b', correctRegionId: 'taoyuan' },
+            { id: 'stamp-hsinchu', name: '新竹縣', image: 'https://placehold.co/96x96/cccccc/333333?text=新竹', correctRegionId: 'hsinchu' }, // Placeholder
+            { id: 'stamp-miaoli', name: '苗栗縣', image: 'https://placehold.co/96x96/dddddd/333333?text=苗栗', correctRegionId: 'miaoli' }, // Placeholder
+        ];
 
-            // 音效物件
-            const successAudio = new Audio('https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/success.mp3');
-            const failAudio = new Audio('https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/fail.mp3');
+        let gameState = {}; // Stores { stampId: 'regionId', ... } for correctly placed stamps
+        let draggedStampId = null;
+        let originalStampContainer = {}; // To store original parent for returning stamps
 
-            // 遊戲數據：郵票圖片與對應的配對ID
-            // 這些圖片連結假設為 GitHub 倉庫中的 png 檔案
-            const stampData = [
-                { id: 'stamp-1', src: 'https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp1.jpg', matchID: 'taipei' }, // 更新為 stamp1.jpg
-                { id: 'stamp-2', src: 'https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp_02.png', matchID: 'taipei' },
-                { id: 'stamp-3', src: 'https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp_03.png', matchID: 'taoyuan' },
-                { id: 'stamp-4', src: 'https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp_04.png', matchID: 'miaoli' },
-                { id: 'stamp-5', src: 'https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp_05.png', matchID: 'new-taipei' },
-                { id: 'stamp-6', src: 'https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp_06.png', matchID: 'keelung' },
-                { id: 'stamp-7', src: 'https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp_07.png', matchID: 'hsinchu' },
-                { id: 'stamp-8', src: 'https://raw.githubusercontent.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp_08.png', matchID: 'hsinchu' }, /* 修正為正確的raw.githubusercontent.com */
-                { id: 'stamp-9', src: 'https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp_09.png', matchID: 'new-taipei' },
-                { id: 'stamp-10', src: 'https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp_10.png', matchID: 'miaoli' },
-                { id: 'stamp-11', src: 'https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp_11.png', matchID: 'taoyuan' },
-            ];
+        // Audio elements - using provided files
+        const correctDropSound = new Audio('stamp1.mp3'); // Correct drop sound
+        const errorSound = new Audio('wrong.mp3');      // Incorrect drop sound
+        const victorySound = new Audio('victory.mp3');   // All correct sound
 
-            // 洗牌函數，將陣列中的元素隨機重新排列
-            function shuffle(array) {
-                for (let i = array.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [array[i], array[j]] = [array[j], array[i]];
+        // Helper function to show a custom message box
+        function showMessageBox(message, type = 'info') {
+            const msgBox = document.getElementById('message-box');
+            const msgText = document.getElementById('message-text');
+            msgText.textContent = message;
+            msgBox.style.display = 'block';
+
+            // Optional: Change border color based on message type
+            if (type === 'success') {
+                msgBox.style.borderColor = '#34d399'; // Green
+            } else if (type === 'error') {
+                msgBox.style.borderColor = '#ef4444'; // Red
+            } else {
+                msgBox.style.borderColor = '#60a5fa'; // Blue (info)
+            }
+
+            document.getElementById('message-box-ok').onclick = () => {
+                msgBox.style.display = 'none';
+            };
+        }
+
+        // Show victory message with animation
+        function showVictoryMessage() {
+            const victoryMessageContainer = document.getElementById('victory-message-container');
+            const victoryText = document.getElementById('victory-text');
+
+            victoryMessageContainer.style.display = 'flex';
+            victoryText.style.animation = 'none'; // Reset animation
+            void victoryText.offsetWidth; // Trigger reflow
+            victoryText.style.animation = 'scaleIn 1s ease-out forwards'; // Restart animation
+            victoryText.style.transform = 'translate(-50%, -50%) scale(1)'; // Ensure final scale is 1
+            victoryText.style.opacity = '1';
+
+            // Hide after a duration if needed, or let it stay until reset
+            setTimeout(() => {
+                victoryMessageContainer.style.display = 'none';
+                victoryText.style.animation = ''; // Clear animation style
+            }, 3000); // Display for 3 seconds
+        }
+
+
+        // Initialize Game
+        function initializeGame() {
+            gameState = {}; // Reset game state
+            const stampsContainer = document.getElementById('stamps-container');
+            stampsContainer.innerHTML = ''; // Clear existing stamps
+            originalStampContainer = {}; // Clear original parent tracker
+
+            // Hide victory message
+            document.getElementById('victory-message-container').style.display = 'none';
+            document.getElementById('victory-text').style.animation = '';
+
+
+            // Clear collected stamps and reset drop zone styles
+            regions.forEach(region => {
+                const collectedPlaceholder = document.getElementById(region.collectedId);
+                collectedPlaceholder.innerHTML = region.name; // Reset to text
+                collectedPlaceholder.classList.add('collected-stamp-placeholder', 'text-gray-400', 'text-sm');
+                collectedPlaceholder.classList.remove('bg-white', 'shadow-md', 'border-green-500');
+
+                const dropZone = document.getElementById(region.dropZoneId);
+                dropZone.classList.remove('correct', 'incorrect');
+                dropZone.classList.add('drop-target');
+                dropZone.textContent = region.name; // Show region name again
+                dropZone.style.opacity = '0.8'; // Reset opacity
+                // Clear any stamps that might be in the drop zone
+                while (dropZone.firstChild) {
+                    if (dropZone.firstChild.tagName === 'IMG') {
+                        dropZone.removeChild(dropZone.firstChild);
+                    } else {
+                        dropZone.appendChild(dropZone.firstChild); // Keep the text node
+                    }
                 }
-                return array;
-            }
-
-            // 遊戲初始化函數
-            function initGame() {
-                // 清空郵票容器和重置目標區域
-                leftStampsContainer.innerHTML = '';
-                rightStampsContainer.innerHTML = '';
-                targetAreas = Array.from(document.querySelectorAll('.target-area')); // 重新獲取所有目標區域
-                targetAreas.forEach(area => {
-                    area.classList.remove('matched');
-                    area.innerHTML = ''; // 清除已配對的郵票
-                    area.style.zIndex = 10; // 確保目標區域在未配對時可接受放置
-                    // 恢復初始拖曳提示樣式
-                    area.style.borderColor = '#ff0000';
-                    area.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
-                });
-
-                matchedCount = 0; // 重置已配對數量
-                seconds = 0;      // 重置計時器
-                timerDisplay.textContent = '00:00';
-                clearInterval(timer); // 清除任何正在運行的計時器
-
-                isPlaying = true; // 設定遊戲狀態為進行中
-                startButton.textContent = '重新開始'; // 更改按鈕文字
-
-                const shuffledStamps = shuffle([...stampData]); // 複製並洗牌郵票數據
-
-                // 將洗牌後的郵票動態添加到頁面，並分發到左右兩個容器
-                shuffledStamps.forEach((stamp, index) => {
-                    const stampElement = document.createElement('div');
-                    stampElement.className = 'stamp flex items-center justify-center bg-gray-50 border border-gray-300 shadow-sm rounded-lg'; // 加上 Tailwind 樣式
-                    stampElement.style.backgroundImage = `url(${stamp.src})`; // 設定背景圖片
-                    stampElement.draggable = true; // 允許拖曳
-                    stampElement.dataset.match = stamp.matchID; // 儲存配對ID
-                    stampElement.dataset.id = stamp.id;         // 儲存唯一ID
-
-                    // 將郵票大致平均分發到左右兩個容器
-                    if (index < Math.ceil(shuffledStamps.length / 2)) {
-                        leftStampsContainer.appendChild(stampElement);
-                    } else {
-                        rightStampsContainer.appendChild(stampElement);
-                    }
-                });
-
-                startTimer(); // 啟動計時器
-            }
-
-            // 啟動計時器函數
-            function startTimer() {
-                timer = setInterval(() => {
-                    seconds++;
-                    const minutes = Math.floor(seconds / 60);
-                    const remainingSeconds = seconds % 60;
-                    // 格式化時間為 MM:SS
-                    const formattedTime = `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
-                    timerDisplay.textContent = formattedTime;
-                }, 1000); // 每秒更新一次
-            }
-
-            // 遊戲結束函數
-            function endGame() {
-                isPlaying = false; // 設定遊戲狀態為已結束
-                clearInterval(timer); // 停止計時器
-                successAudio.play(); // 播放成功音效
-                alert(`恭喜您完成所有配對！總共花費 ${timerDisplay.textContent}。`); // 彈出結束訊息
-                startButton.textContent = '再玩一次'; // 更改按鈕文字
-            }
-
-            // === 拖曳事件處理 ===
-            let draggedStamp = null; // 用於儲存當前正在拖曳的郵票元素
-
-            // 當拖曳開始時觸發
-            document.addEventListener('dragstart', (e) => {
-                // 檢查遊戲是否進行中且目標是郵票
-                if (!isPlaying || !e.target.classList.contains('stamp')) return;
-                draggedStamp = e.target; // 設定正在拖曳的郵票
-                // 延遲添加 'dragging' 類，防止在拖曳開始時圖片被隱藏
-                setTimeout(() => {
-                    e.target.classList.add('dragging');
-                }, 0);
             });
 
-            // 當拖曳結束時觸發 (無論是否成功放置)
-            document.addEventListener('dragend', (e) => {
-                if (!draggedStamp) return; // 如果沒有正在拖曳的郵票，則返回
-                draggedStamp.classList.remove('dragging'); // 移除 'dragging' 類
-                draggedStamp = null; // 清空正在拖曳的郵票
-            });
+            // Shuffle stamps for variety
+            const shuffledStamps = [...stamps].sort(() => Math.random() - 0.5);
 
-            // 遍歷所有目標區域，為它們添加拖曳相關事件監聽
-            targetAreas = Array.from(document.querySelectorAll('.target-area')); // 初始化時獲取目標區域
-            targetAreas.forEach(area => {
-                // 當拖曳物體進入目標區域上方時觸發 (必須阻止預設行為才能觸發 drop)
-                area.addEventListener('dragover', (e) => {
-                    e.preventDefault(); // 阻止預設行為，允許放置
-                    // 可以添加視覺反饋，例如改變目標區域的邊框顏色
-                    if (!area.classList.contains('matched')) {
-                        area.style.borderColor = '#007BFF'; // 拖曳時顯示藍色邊框
-                        area.style.backgroundColor = 'rgba(0, 123, 255, 0.1)';
+            shuffledStamps.forEach(stamp => {
+                const img = document.createElement('img');
+                img.src = stamp.image;
+                img.alt = stamp.name + '郵票';
+                img.id = stamp.id;
+                img.classList.add('w-24', 'h-24', 'object-cover', 'rounded-md', 'shadow-md', 'drag-item', 'border-2', 'border-gray-200');
+                img.setAttribute('draggable', true);
+                img.dataset.correctRegionId = stamp.correctRegionId; // Store correct region ID
+
+                stampsContainer.appendChild(img);
+                originalStampContainer[stamp.id] = stampsContainer; // Track original parent
+
+                // Add drag event listener for desktop
+                img.addEventListener('dragstart', (e) => {
+                    draggedStampId = e.target.id;
+                    e.dataTransfer.setData('text/plain', draggedStampId);
+                    e.dataTransfer.setDragImage(e.target, 0, 0); // Use the stamp image as drag image
+                    e.target.classList.add('opacity-50', 'border-blue-500'); // Visual feedback when dragging
+                });
+
+                img.addEventListener('dragend', (e) => {
+                    e.target.classList.remove('opacity-50', 'border-blue-500');
+                });
+
+                // Add touch event listeners for mobile drag and drop
+                let initialX, initialY;
+                let currentDraggedElement = null; // To track the element being touched/moved
+
+                img.addEventListener('touchstart', (e) => {
+                    e.preventDefault(); // Prevent scrolling
+                    draggedStampId = e.target.id;
+                    currentDraggedElement = e.target;
+                    e.target.classList.add('opacity-50', 'border-blue-500');
+
+                    // Clone the element to allow dragging outside its original container
+                    const clone = e.target.cloneNode(true);
+                    clone.id = 'dragging-' + e.target.id; // Give clone a unique ID
+                    clone.style.position = 'absolute';
+                    clone.style.zIndex = '100';
+                    clone.style.width = e.target.offsetWidth + 'px'; // Maintain original size
+                    clone.style.height = e.target.offsetHeight + 'px';
+                    document.body.appendChild(clone);
+                    currentDraggedElement = clone; // Now drag the clone
+
+                    // Hide original element temporarily
+                    e.target.style.visibility = 'hidden';
+
+                    initialX = e.touches[0].clientX - e.target.getBoundingClientRect().left;
+                    initialY = e.touches[0].clientY - e.target.getBoundingClientRect().top;
+
+                    currentDraggedElement.style.left = (e.touches[0].clientX - initialX) + 'px';
+                    currentDraggedElement.style.top = (e.touches[0].clientY - initialY) + 'px';
+                });
+
+                img.addEventListener('touchmove', (e) => {
+                    e.preventDefault(); // Prevent scrolling
+                    if (currentDraggedElement) {
+                        currentDraggedElement.style.left = (e.touches[0].clientX - initialX) + 'px';
+                        currentDraggedElement.style.top = (e.touches[0].clientY - initialY) + 'px';
                     }
                 });
 
-                // 當拖曳物體離開目標區域時觸發
-                area.addEventListener('dragleave', (e) => {
-                    // 恢復原始邊框顏色
-                    if (!area.classList.contains('matched')) {
-                        area.style.borderColor = '#ff0000';
-                        area.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
-                    }
-                });
+                img.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    if (!currentDraggedElement) return;
 
-                // 當拖曳物體在目標區域上釋放時觸發
-                area.addEventListener('drop', (e) => {
-                    e.preventDefault(); // 阻止預設行為
-                    // 恢復原始邊框顏色，無論是否配對成功
-                    area.style.borderColor = '#ff0000';
-                    area.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
+                    currentDraggedElement.classList.remove('opacity-50', 'border-blue-500');
+                    const originalStamp = document.getElementById(draggedStampId);
 
-                    // 如果沒有正在拖曳的郵票，或者目標區域已經被配對，則返回
-                    if (!draggedStamp || area.classList.contains('matched')) return;
+                    let droppedCorrectly = false;
+                    let targetDropZone = null;
 
-                    const targetMatchID = area.dataset.match;      // 目標區域的配對ID
-                    const stampMatchID = draggedStamp.dataset.match; // 郵票的配對ID
+                    // Check if dropped within any drop zone
+                    regions.forEach(region => {
+                        const dropZone = document.getElementById(region.dropZoneId);
+                        const dropZoneRect = dropZone.getBoundingClientRect();
+                        const touch = e.changedTouches[0];
 
-                    // 判斷是否配對成功
-                    if (targetMatchID === stampMatchID) {
-                        console.log('配對成功!');
-                        successAudio.play(); // 播放成功音效
-                        area.appendChild(draggedStamp); // 將郵票放置到目標區域內
-                        area.classList.add('matched');  // 添加 'matched' 類以改變樣式
-                        draggedStamp.style.position = 'absolute'; // 設置郵票位置為絕對
-                        draggedStamp.style.left = '50%';          // 水平居中
-                        draggedStamp.style.top = '50%';           // 垂直居中
-                        draggedStamp.style.transform = 'translate(-50%, -50%)'; // 使用 transform 確保精確居中
-                        draggedStamp.draggable = false;           // 配對成功後不可再拖曳
-                        draggedStamp.classList.remove('dragging'); // 移除 dragging 類
-                        area.style.zIndex = 1; // 將已配對的區域 z-index 調低，防止干擾其他未配對區域
+                        // Use the cloned element's position for checking
+                        const cloneRect = currentDraggedElement.getBoundingClientRect();
 
-                        draggedStamp = null; // 清空正在拖曳的郵票
-                        matchedCount++;     // 增加已配對數量
+                        if (cloneRect.right > dropZoneRect.left &&
+                            cloneRect.left < dropZoneRect.right &&
+                            cloneRect.bottom > dropZoneRect.top &&
+                            cloneRect.top < dropZoneRect.bottom) {
+                            targetDropZone = dropZone;
+                            // Only allow drop if the drop zone is empty (no image children)
+                            if (!dropZone.querySelector('img')) {
+                                if (originalStamp.dataset.correctRegionId === region.id) {
+                                    // Correct placement
+                                    correctDropSound.play();
+                                    gameState[draggedStampId] = region.id;
 
-                        if (matchedCount === stampData.length) {
-                            endGame(); // 如果所有郵票都已配對，則結束遊戲
+                                    // Move original stamp to the drop zone
+                                    dropZone.appendChild(originalStamp);
+                                    originalStamp.classList.remove('drag-item', 'w-24', 'h-24');
+                                    originalStamp.classList.add('w-16', 'h-16', 'border-green-500', 'shadow-inner');
+                                    originalStamp.removeAttribute('draggable');
+                                    originalStamp.style.visibility = 'visible'; // Show original stamp
+                                    originalStamp.style.position = ''; // Reset position styles
+                                    originalStamp.style.left = '';
+                                    originalStamp.style.top = '';
+                                    originalStamp.style.zIndex = '';
+
+
+                                    dropZone.classList.add('correct');
+                                    dropZone.classList.remove('drop-target');
+                                    dropZone.textContent = ''; // Clear text, stamp takes its place
+
+                                    // Move stamp to collected area (creating a new clone for visual consistency)
+                                    const collectedPlaceholder = document.getElementById(region.collectedId);
+                                    collectedPlaceholder.innerHTML = '';
+                                    collectedPlaceholder.classList.remove('collected-stamp-placeholder', 'text-gray-400', 'text-sm');
+                                    collectedPlaceholder.classList.add('bg-white', 'shadow-md', 'border-2', 'border-green-500', 'flex', 'items-center', 'justify-center');
+
+                                    const collectedImg = document.createElement('img');
+                                    collectedImg.src = originalStamp.src;
+                                    collectedImg.alt = originalStamp.alt;
+                                    collectedImg.classList.add('w-20', 'h-20', 'object-cover', 'rounded-md');
+                                    collectedPlaceholder.appendChild(collectedImg);
+
+                                    checkWinCondition();
+                                    droppedCorrectly = true;
+                                } else {
+                                    // Incorrect placement within a valid, empty drop zone
+                                    errorSound.play();
+                                    dropZone.classList.add('incorrect');
+                                    setTimeout(() => {
+                                        dropZone.classList.remove('incorrect');
+                                    }, 500);
+                                    droppedCorrectly = false; // Still an incorrect drop within a zone
+                                }
+                            } else {
+                                // Drop zone is already occupied
+                                errorSound.play();
+                                dropZone.classList.add('incorrect'); // Briefly show feedback
+                                setTimeout(() => { dropZone.classList.remove('incorrect'); }, 500);
+                                droppedCorrectly = false; // Treat as incorrect as it couldn't be placed
+                            }
                         }
-                    } else {
-                        console.log('配對失敗!');
-                        failAudio.play(); // 播放失敗音效
-                        // 失敗後，郵票會因為 dragend 事件而自動取消 dragging 狀態
-                        // 如果需要額外提示，可以在這裡添加
+                    });
+
+                    // Remove the clone after touch end
+                    if (currentDraggedElement && currentDraggedElement.parentNode) {
+                        currentDraggedElement.parentNode.removeChild(currentDraggedElement);
                     }
+                    originalStamp.style.visibility = 'visible'; // Ensure original is visible if not moved
+
+                    if (!droppedCorrectly) {
+                        // If not dropped correctly in an empty zone, return original stamp to its original container
+                        const originalParent = originalStampContainer[draggedStampId];
+                        if (originalParent) {
+                            originalParent.appendChild(originalStamp);
+                            originalStamp.style.position = '';
+                            originalStamp.style.left = '';
+                            originalStamp.style.top = '';
+                            originalStamp.style.zIndex = '';
+                        }
+                    }
+                    draggedStampId = null; // Reset dragged stamp ID
+                    currentDraggedElement = null; // Reset current dragged element
                 });
             });
 
-            // 啟動按鈕點擊事件
-            startButton.addEventListener('click', () => {
-                initGame(); // 點擊按鈕時初始化遊戲
-            });
+            // Add drop event listeners to all drop zones for mouse interaction
+            regions.forEach(region => {
+                const dropZone = document.getElementById(region.dropZoneId);
+                dropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault(); // Allow drop
+                    const draggedStamp = document.getElementById(draggedStampId);
+                    // Only apply hover if stamp isn't already placed AND drop zone is empty
+                    if (draggedStampId && !gameState[draggedStampId] && !dropZone.querySelector('img')) {
+                        dropZone.classList.add('hovered');
+                    }
+                });
 
-            // 初始載入時提示使用者
-            alert('歡迎來到臺灣印象配對趣！請點擊「開始遊戲」按鈕開始。');
+                dropZone.addEventListener('dragleave', () => {
+                    dropZone.classList.remove('hovered');
+                });
+
+                dropZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('hovered');
+
+                    if (!draggedStampId) return; // No stamp being dragged
+
+                    const droppedStamp = document.getElementById(draggedStampId);
+                    // Check if stamp already placed OR if the drop zone is already occupied
+                    if (!droppedStamp || gameState[draggedStampId] || dropZone.querySelector('img')) {
+                        // Return stamp to its original container if already placed or target is occupied
+                        const originalParent = originalStampContainer[draggedStampId];
+                        if (originalParent) {
+                            originalParent.appendChild(droppedStamp);
+                        }
+                        return;
+                    }
+
+                    const correctRegionIdForStamp = droppedStamp.dataset.correctRegionId;
+                    const targetRegionId = region.id;
+
+                    if (correctRegionIdForStamp === targetRegionId) {
+                        // Correct placement
+                        correctDropSound.play();
+                        gameState[draggedStampId] = targetRegionId; // Update game state
+
+                        // Move stamp to the drop zone (visually)
+                        dropZone.appendChild(droppedStamp);
+                        droppedStamp.classList.remove('drag-item', 'w-24', 'h-24'); // Remove draggable styles
+                        droppedStamp.classList.add('w-16', 'h-16', 'border-green-500', 'shadow-inner'); // Smaller on map
+                        droppedStamp.removeAttribute('draggable');
+
+                        // Update drop zone style
+                        dropZone.classList.add('correct');
+                        dropZone.classList.remove('drop-target');
+                        dropZone.textContent = ''; // Remove text from drop zone
+
+                        // Move stamp to collected area
+                        const collectedPlaceholder = document.getElementById(region.collectedId);
+                        collectedPlaceholder.innerHTML = ''; // Clear placeholder text
+                        collectedPlaceholder.classList.remove('collected-stamp-placeholder', 'text-gray-400', 'text-sm');
+                        collectedPlaceholder.classList.add('bg-white', 'shadow-md', 'border-2', 'border-green-500', 'flex', 'items-center', 'justify-center');
+
+                        const collectedImg = document.createElement('img');
+                        collectedImg.src = droppedStamp.src;
+                        collectedImg.alt = droppedStamp.alt;
+                        collectedImg.classList.add('w-20', 'h-20', 'object-cover', 'rounded-md');
+                        collectedPlaceholder.appendChild(collectedImg);
+
+                        checkWinCondition();
+
+                    } else {
+                        // Incorrect placement
+                        errorSound.play();
+                        dropZone.classList.add('incorrect');
+                        setTimeout(() => {
+                            dropZone.classList.remove('incorrect');
+                        }, 500); // Briefly show incorrect feedback
+
+                        // Return stamp to its original container (stamps-container)
+                        const originalParent = originalStampContainer[draggedStampId];
+                        if (originalParent) {
+                            originalParent.appendChild(droppedStamp);
+                        }
+                    }
+                    draggedStampId = null; // Reset dragged stamp ID
+                });
+            });
+        }
+
+        function checkWinCondition() {
+            if (Object.keys(gameState).length === stamps.length) {
+                // All stamps are placed
+                victorySound.play();
+                showVictoryMessage(); // Show "有夠gâu！" animation
+            }
+        }
+
+        // Button Event Listeners
+        document.getElementById('reset-button').addEventListener('click', initializeGame); // 「閣耍一擺」
+
+        document.getElementById('back-to-home-button').addEventListener('click', () => {
+            window.location.reload(); // 「回到遊戲首頁」 - simply reload the page
         });
+
+        // Initialize the game when the window loads
+        window.onload = initializeGame;
+
     </script>
 </body>
 </html>
