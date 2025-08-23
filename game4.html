@@ -3,85 +3,337 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>台灣北部地圖互動遊戲</title>
+    <title>臺灣印象配對趣</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        /* CSS 樣式區域 - 使用 Tailwind CSS 輔助 */
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f0f4f8;
         }
 
-        .dropzone {
-            border: 2px dashed #b1b1b1;
-            border-radius: 10px;
-            position: absolute;
-            opacity: 0.7;
-            transition: all 0.2s ease-in-out;
-        }
-
-        .dropzone.hover {
-            border-color: #4a90e2;
-            background-color: #e6f0ff;
-            transform: scale(1.05);
-        }
-
-        .correct {
-            border: 3px solid #4ade80 !important;
-            box-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
-            transition: all 0.3s ease-in-out;
-        }
-
-        .incorrect {
-            border: 3px solid #ef4444 !important;
-            box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
-            transition: all 0.3s ease-in-out;
-        }
-
+        /* 自訂樣式以覆蓋或擴展 Tailwind */
         .stamp {
+            width: 100px;
+            height: 140px;
+            background-size: cover;
+            background-position: center;
+            user-select: none; /* 防止圖片被選取 */
             cursor: grab;
-            transition: transform 0.2s ease-in-out;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border-radius: 8px; /* 圓角 */
         }
-        
-        .stamp:active {
+        .stamp:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.2);
+        }
+        .stamp.dragging {
+            opacity: 0.7;
             cursor: grabbing;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            transform: scale(1.1);
+            z-index: 1000; /* 確保拖曳時郵票在最上層 */
         }
 
-        .title {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #1e3a8a;
-            margin-top: 20px;
-            margin-bottom: 40px;
+        .map-container {
+            position: relative;
+        }
+        .taiwan-map {
+            width: 100%;
+            height: auto;
+            max-width: 800px; /* 限制地圖最大寬度 */
+            border-radius: 12px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .target-area {
+            position: absolute;
+            border: 2px dashed #ff0000; /* 紅色虛線框 */
+            background-color: rgba(255, 0, 0, 0.1);
+            border-radius: 8px; /* 圓角 */
+            transition: background-color 0.3s, border-color 0.3s;
+            z-index: 10;
+        }
+        .target-area.matched {
+            border: 2px solid #008000; /* 綠色實線框 */
+            background-color: rgba(0, 128, 0, 0.2);
+        }
+
+        /* 根據新的地圖圖片 (north2_map.png)，請務必調整以下目標框的位置和尺寸 */
+        /* 目前的數值是基於舊地圖的，在新地圖上可能不準確 */
+        .target-area[data-match="taipei"] { top: 22%; left: 58%; width: 70px; height: 70px; }
+        .target-area[data-match="keelung"] { top: 25%; left: 70%; width: 60px; height: 60px; }
+        .target-area[data-match="new-taipei"] { top: 38%; left: 63%; width: 90px; height: 90px; }
+        .target-area[data-match="taoyuan"] { top: 37%; left: 49%; width: 90px; height: 90px; }
+        .target-area[data-match="hsinchu"] { top: 51%; left: 45%; width: 90px; height: 90px; }
+        .target-area[data-match="miaoli"] { top: 62%; left: 42%; width: 110px; height: 110px; }
+
+        /* 響應式設計 */
+        @media (max-width: 900px) {
+            main {
+                flex-direction: column;
+                align-items: center;
+            }
+            .stamp-container {
+                flex-direction: row;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 10px;
+                flex: none; /* 在小螢幕上不固定寬度 */
+                width: 100%; /* 佔滿可用寬度 */
+            }
+            .stamp {
+                width: 80px;
+                height: 110px;
+            }
+            .map-container {
+                flex: 1;
+                width: 100%;
+            }
         }
     </style>
 </head>
-<body class="flex flex-col items-center justify-center min-h-screen p-4">
-    <h1 class="title">臺灣北部地圖 & 注音符號郵票配對遊戲</h1>
-    <div class="relative w-full max-w-7xl flex flex-col md:flex-row items-center justify-center">
+<body class="flex flex-col items-center min-h-screen bg-gray-100 p-5">
 
-        <!-- 左側郵票區 -->
-        <div id="left-stamps" class="flex flex-col gap-4 p-4 rounded-xl bg-white shadow-lg z-10 md:absolute md:left-4">
-            <!-- 郵票圖片 (已更新) -->
-            <img draggable="true" id="stamp-ma" src="https://github.com/tsong-su/iuhi/blob/main/game4_assets/stamp1.jpg?raw=true" alt="馬" class="stamp rounded-lg shadow-md">
-            <img draggable="true" id="stamp-guang" src="https://github.com/tsong-su/iuhi/blob/main/game4_assets/north_img2.png?raw=true" alt="廣" class="stamp rounded-lg shadow-md">
-            <img draggable="true" id="stamp-sa" src="https://github.com/tsong-su/iuhi/blob/main/game4_assets/north_img3.png?raw=true" alt="撒" class="stamp rounded-lg shadow-md">
-            <img draggable="true" id="stamp-hua" src="https://github.com/tsong-su/iuhi/blob/main/game4_assets/north_img7.png?raw=true" alt="花" class="stamp rounded-lg shadow-md">
-            <img draggable="true" id="stamp-cao" src="https://github.com/tsong-su/iuhi/blob/main/game4_assets/north_img8.png?raw=true" alt="草" class="stamp rounded-lg shadow-md">
-            <img draggable="true" id="stamp-bi" src="https://github.com/tsong-su/iuhi/blob/main/game4_assets/north_img12.png?raw=true" alt="壁" class="stamp rounded-lg shadow-md">
+    <header class="w-full max-w-5xl text-center mb-8 bg-white p-6 rounded-lg shadow-md">
+        <h1 class="text-4xl font-extrabold text-gray-800 mb-4">臺灣印象配對趣</h1>
+        <div class="controls flex justify-center items-center gap-6">
+            <button id="startButton" class="px-6 py-3 text-lg font-bold text-white bg-blue-600 rounded-full shadow-lg hover:bg-blue-700 transition duration-300 ease-in-out transform hover:scale-105">
+                開始遊戲
+            </button>
+            <div class="timer text-2xl font-semibold text-gray-700">時間: <span id="timerDisplay">00:00</span></div>
+        </div>
+    </header>
+
+    <main class="flex flex-col lg:flex-row w-full max-w-6xl justify-center gap-8 lg:gap-12 flex-grow">
+        <!-- 左側郵票容器 -->
+        <div id="leftStamps" class="stamp-container flex-shrink-0 bg-white p-4 rounded-lg shadow-md border border-gray-200">
+            <!-- 郵票圖片將由 JavaScript 動態生成 -->
         </div>
 
-        <!-- 中間地圖區 -->
-        <div id="map-container" class="relative w-full max-w-[800px] aspect-[1200/800] my-8">
-            <!-- 台灣北部地圖圖片 -->
-            <img src="https://github.com/tsong-su/iuhi/blob/main/game4_assets/north2_map.png?raw=true" alt="台灣北部地圖" class="w-full h-auto rounded-xl shadow-2xl">
+        <!-- 中間地圖容器 -->
+        <div id="mapContainer" class="map-container flex-grow bg-white p-4 rounded-lg shadow-md flex justify-center items-center relative">
+            <!-- 使用 GitHub 倉庫中的新地圖圖片 -->
+            <img src="https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/north2_map.png" alt="臺灣地圖" class="taiwan-map">
+            <!-- 地圖上的配對目標框 -->
+            <div class="target-area" data-match="taipei"></div>
+            <div class="target-area" data-match="keelung"></div>
+            <div class="target-area" data-match="new-taipei"></div>
+            <div class="target-area" data-match="taoyuan"></div>
+            <div class="target-area" data-match="hsinchu"></div>
+            <div class="target-area" data-match="miaoli"></div>
+        </div>
 
-            <!-- 拖放區 (Dropzones) -->
-            <!-- 台北市 (Taipei) -->
-            <div id="dropzone-taipei" data-correct-stamp="stamp-tai" class="dropzone w-[12%] h-[12%] top-[30%] left-[50%]"></div>
-            <!-- 新北市 (New Taipei) -->
-            <div id="dropzone-newtaipei" data-correct-stamp="stamp-sa" class="dropzone w-[18%] h-[20%] top-[40%] left-[58%]"></div>
-            <!-- 桃園縣 (Taoyuan) -->
-            <div id="dropzone-taoyuan" data-correct-stamp="stamp-ma" class="dropzone w-[15%] h-[15%] top-[50%] left-[45%]"></div>
-            <!-- 基隆市 (Keelung) -->
-            <div id="dropzone-keelung" data-correct-stamp="stamp-guang" class="dropzone w-[10%]
+        <!-- 右側郵票容器 -->
+        <div id="rightStamps" class="stamp-container flex-shrink-0 bg-white p-4 rounded-lg shadow-md border border-gray-200">
+            <!-- 郵票圖片將由 JavaScript 動態生成 -->
+        </div>
+    </main>
+
+    <script>
+        // JavaScript 邏輯區域
+        document.addEventListener('DOMContentLoaded', () => {
+            const startButton = document.getElementById('startButton');
+            const timerDisplay = document.getElementById('timerDisplay');
+            const leftStampsContainer = document.getElementById('leftStamps');
+            const rightStampsContainer = document.getElementById('rightStamps');
+            const mapContainer = document.getElementById('mapContainer');
+            const taiwanMap = document.querySelector('.taiwan-map');
+            let targetAreas = []; // 儲存目標區域的陣列
+
+            let timer;
+            let seconds = 0;
+            let isPlaying = false;
+            let matchedCount = 0;
+
+            // 音效物件
+            const successAudio = new Audio('https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/success.mp3');
+            const failAudio = new Audio('https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/fail.mp3');
+
+            // 遊戲數據：郵票圖片與對應的配對ID
+            // 這些圖片連結假設為 GitHub 倉庫中的 png 檔案
+            const stampData = [
+                { id: 'stamp-1', src: 'https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp1.jpg', matchID: 'taipei' }, // 更新為 stamp1.jpg
+                { id: 'stamp-2', src: 'https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp_02.png', matchID: 'taipei' },
+                { id: 'stamp-3', src: 'https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp_03.png', matchID: 'taoyuan' },
+                { id: 'stamp-4', src: 'https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp_04.png', matchID: 'miaoli' },
+                { id: 'stamp-5', src: 'https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp_05.png', matchID: 'new-taipei' },
+                { id: 'stamp-6', src: 'https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp_06.png', matchID: 'keelung' },
+                { id: 'stamp-7', src: 'https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp_07.png', matchID: 'hsinchu' },
+                { id: 'stamp-8', src: 'https://raw.githubusercontent.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp_08.png', matchID: 'hsinchu' }, /* 修正為正確的raw.githubusercontent.com */
+                { id: 'stamp-9', src: 'https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp_09.png', matchID: 'new-taipei' },
+                { id: 'stamp-10', src: 'https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp_10.png', matchID: 'miaoli' },
+                { id: 'stamp-11', src: 'https://raw.githubusercontent.com/tsong-su/iuhi/main/game4_assets/stamp_11.png', matchID: 'taoyuan' },
+            ];
+
+            // 洗牌函數，將陣列中的元素隨機重新排列
+            function shuffle(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            }
+
+            // 遊戲初始化函數
+            function initGame() {
+                // 清空郵票容器和重置目標區域
+                leftStampsContainer.innerHTML = '';
+                rightStampsContainer.innerHTML = '';
+                targetAreas = Array.from(document.querySelectorAll('.target-area')); // 重新獲取所有目標區域
+                targetAreas.forEach(area => {
+                    area.classList.remove('matched');
+                    area.innerHTML = ''; // 清除已配對的郵票
+                    area.style.zIndex = 10; // 確保目標區域在未配對時可接受放置
+                    // 恢復初始拖曳提示樣式
+                    area.style.borderColor = '#ff0000';
+                    area.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
+                });
+
+                matchedCount = 0; // 重置已配對數量
+                seconds = 0;      // 重置計時器
+                timerDisplay.textContent = '00:00';
+                clearInterval(timer); // 清除任何正在運行的計時器
+
+                isPlaying = true; // 設定遊戲狀態為進行中
+                startButton.textContent = '重新開始'; // 更改按鈕文字
+
+                const shuffledStamps = shuffle([...stampData]); // 複製並洗牌郵票數據
+
+                // 將洗牌後的郵票動態添加到頁面，並分發到左右兩個容器
+                shuffledStamps.forEach((stamp, index) => {
+                    const stampElement = document.createElement('div');
+                    stampElement.className = 'stamp flex items-center justify-center bg-gray-50 border border-gray-300 shadow-sm rounded-lg'; // 加上 Tailwind 樣式
+                    stampElement.style.backgroundImage = `url(${stamp.src})`; // 設定背景圖片
+                    stampElement.draggable = true; // 允許拖曳
+                    stampElement.dataset.match = stamp.matchID; // 儲存配對ID
+                    stampElement.dataset.id = stamp.id;         // 儲存唯一ID
+
+                    // 將郵票大致平均分發到左右兩個容器
+                    if (index < Math.ceil(shuffledStamps.length / 2)) {
+                        leftStampsContainer.appendChild(stampElement);
+                    } else {
+                        rightStampsContainer.appendChild(stampElement);
+                    }
+                });
+
+                startTimer(); // 啟動計時器
+            }
+
+            // 啟動計時器函數
+            function startTimer() {
+                timer = setInterval(() => {
+                    seconds++;
+                    const minutes = Math.floor(seconds / 60);
+                    const remainingSeconds = seconds % 60;
+                    // 格式化時間為 MM:SS
+                    const formattedTime = `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+                    timerDisplay.textContent = formattedTime;
+                }, 1000); // 每秒更新一次
+            }
+
+            // 遊戲結束函數
+            function endGame() {
+                isPlaying = false; // 設定遊戲狀態為已結束
+                clearInterval(timer); // 停止計時器
+                successAudio.play(); // 播放成功音效
+                alert(`恭喜您完成所有配對！總共花費 ${timerDisplay.textContent}。`); // 彈出結束訊息
+                startButton.textContent = '再玩一次'; // 更改按鈕文字
+            }
+
+            // === 拖曳事件處理 ===
+            let draggedStamp = null; // 用於儲存當前正在拖曳的郵票元素
+
+            // 當拖曳開始時觸發
+            document.addEventListener('dragstart', (e) => {
+                // 檢查遊戲是否進行中且目標是郵票
+                if (!isPlaying || !e.target.classList.contains('stamp')) return;
+                draggedStamp = e.target; // 設定正在拖曳的郵票
+                // 延遲添加 'dragging' 類，防止在拖曳開始時圖片被隱藏
+                setTimeout(() => {
+                    e.target.classList.add('dragging');
+                }, 0);
+            });
+
+            // 當拖曳結束時觸發 (無論是否成功放置)
+            document.addEventListener('dragend', (e) => {
+                if (!draggedStamp) return; // 如果沒有正在拖曳的郵票，則返回
+                draggedStamp.classList.remove('dragging'); // 移除 'dragging' 類
+                draggedStamp = null; // 清空正在拖曳的郵票
+            });
+
+            // 遍歷所有目標區域，為它們添加拖曳相關事件監聽
+            targetAreas = Array.from(document.querySelectorAll('.target-area')); // 初始化時獲取目標區域
+            targetAreas.forEach(area => {
+                // 當拖曳物體進入目標區域上方時觸發 (必須阻止預設行為才能觸發 drop)
+                area.addEventListener('dragover', (e) => {
+                    e.preventDefault(); // 阻止預設行為，允許放置
+                    // 可以添加視覺反饋，例如改變目標區域的邊框顏色
+                    if (!area.classList.contains('matched')) {
+                        area.style.borderColor = '#007BFF'; // 拖曳時顯示藍色邊框
+                        area.style.backgroundColor = 'rgba(0, 123, 255, 0.1)';
+                    }
+                });
+
+                // 當拖曳物體離開目標區域時觸發
+                area.addEventListener('dragleave', (e) => {
+                    // 恢復原始邊框顏色
+                    if (!area.classList.contains('matched')) {
+                        area.style.borderColor = '#ff0000';
+                        area.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
+                    }
+                });
+
+                // 當拖曳物體在目標區域上釋放時觸發
+                area.addEventListener('drop', (e) => {
+                    e.preventDefault(); // 阻止預設行為
+                    // 恢復原始邊框顏色，無論是否配對成功
+                    area.style.borderColor = '#ff0000';
+                    area.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
+
+                    // 如果沒有正在拖曳的郵票，或者目標區域已經被配對，則返回
+                    if (!draggedStamp || area.classList.contains('matched')) return;
+
+                    const targetMatchID = area.dataset.match;      // 目標區域的配對ID
+                    const stampMatchID = draggedStamp.dataset.match; // 郵票的配對ID
+
+                    // 判斷是否配對成功
+                    if (targetMatchID === stampMatchID) {
+                        console.log('配對成功!');
+                        successAudio.play(); // 播放成功音效
+                        area.appendChild(draggedStamp); // 將郵票放置到目標區域內
+                        area.classList.add('matched');  // 添加 'matched' 類以改變樣式
+                        draggedStamp.style.position = 'absolute'; // 設置郵票位置為絕對
+                        draggedStamp.style.left = '50%';          // 水平居中
+                        draggedStamp.style.top = '50%';           // 垂直居中
+                        draggedStamp.style.transform = 'translate(-50%, -50%)'; // 使用 transform 確保精確居中
+                        draggedStamp.draggable = false;           // 配對成功後不可再拖曳
+                        draggedStamp.classList.remove('dragging'); // 移除 dragging 類
+                        area.style.zIndex = 1; // 將已配對的區域 z-index 調低，防止干擾其他未配對區域
+
+                        draggedStamp = null; // 清空正在拖曳的郵票
+                        matchedCount++;     // 增加已配對數量
+
+                        if (matchedCount === stampData.length) {
+                            endGame(); // 如果所有郵票都已配對，則結束遊戲
+                        }
+                    } else {
+                        console.log('配對失敗!');
+                        failAudio.play(); // 播放失敗音效
+                        // 失敗後，郵票會因為 dragend 事件而自動取消 dragging 狀態
+                        // 如果需要額外提示，可以在這裡添加
+                    }
+                });
+            });
+
+            // 啟動按鈕點擊事件
+            startButton.addEventListener('click', () => {
+                initGame(); // 點擊按鈕時初始化遊戲
+            });
+
+            // 初始載入時提示使用者
+            alert('歡迎來到臺灣印象配對趣！請點擊「開始遊戲」按鈕開始。');
+        });
+    </script>
+</body>
+</html>
